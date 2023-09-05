@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="10.11.0">
+<file name="/Users/GAETAN/git/credentials-less-slides-demo1/Dockerfile">
+</file>
+<file name="/Users/GAETAN/git/credentials-less-slides-demo1/.mvn/wrapper/MavenWrapperDownloader.java">
+</file>
+<file name="/Users/GAETAN/git/credentials-less-slides-demo1/.mvn/wrapper/maven-wrapper.properties">
+</file>
+<file name="/Users/GAETAN/git/credentials-less-slides-demo1/.mvn/wrapper/maven-wrapper.jar">
+</file>
+<file name="/Users/GAETAN/git/credentials-less-slides-demo1/.github/workflows/buildAndPush.yaml">
+</file>
+</checkstyle>
