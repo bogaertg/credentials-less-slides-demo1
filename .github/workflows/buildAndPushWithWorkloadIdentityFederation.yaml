@@ -13,6 +13,9 @@ jobs:
       contents: 'read'
       id-token: 'write'
     steps:
+      - name: Sleep for 10 seconds
+        run: sleep 10s
+        shell: bash
       - id: 'auth'
         uses: 'google-github-actions/auth@v1'
         with:
@@ -30,6 +33,6 @@ jobs:
       - name: Push
         uses: docker/build-push-action@v4
         with:
-          tags: ${{ vars.GAR_REGISTRY }}/petclinic-workload-identity-federation:latest
+          tags: ${{ vars.GAR_REGISTRY }}/my-app-workload-identity-federation:latest
           push: true
 

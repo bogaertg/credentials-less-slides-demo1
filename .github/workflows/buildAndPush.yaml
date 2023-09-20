@@ -5,13 +5,14 @@ on:
       - main
   workflow_dispatch:
 
-
-
 jobs:
   buildAndPush:
     name: build and push
     runs-on: ubuntu-latest
     steps:
+      - name: Sleep for 10 seconds
+        run: sleep 10s
+        shell: bash
       - id: 'auth'
         uses: 'google-github-actions/auth@v1'
         with:
@@ -28,6 +29,6 @@ jobs:
       - name: Push
         uses: docker/build-push-action@v4
         with:
-          tags: ${{ vars.GAR_REGISTRY }}/petclinic:latest
+          tags: ${{ vars.GAR_REGISTRY }}/my-app:latest
           push: true
 
