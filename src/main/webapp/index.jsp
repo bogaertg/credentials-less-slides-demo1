@@ -93,11 +93,11 @@ limitations under the License.
   function vote(team) {
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
-      if (this.readyState == 4) {
-        if (!window.alert(this.responseText)) {
+      // if (this.readyState == 4) {
+      //   if (!window.alert(this.responseText)) {
           window.location.reload();
-        }
-      }
+      //   }
+      // }
     };
     xhr.open("POST", "/", true);
     xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");

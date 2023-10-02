@@ -35,9 +35,6 @@ public class ConnectorConnectionPoolFactory extends ConnectionPoolFactory {
   private static final String DB_PASS = System.getenv("DB_PASS");
   private static final String DB_NAME = System.getenv("DB_NAME");
 
-  private static final String DB_HOST = System.getenv("DB_HOST");
-
-
   public static DataSource createConnectionPool() {
     // The configuration object specifies behaviors for the connection pool.
     HikariConfig config = new HikariConfig();
@@ -49,7 +46,7 @@ public class ConnectorConnectionPoolFactory extends ConnectionPoolFactory {
     // https://github.com/GoogleCloudPlatform/cloud-sql-jdbc-socket-factory#creating-the-jdbc-url
 
     // Configure which instance and what database user to connect with.
-    config.setJdbcUrl(String.format("jdbc:postgresql://%s/%s",DB_HOST, DB_NAME));
+    config.setJdbcUrl(String.format("jdbc:postgresql:///%s", DB_NAME));
     config.setUsername(DB_USER); // e.g. "root", _postgres"
     config.setPassword(DB_PASS); // e.g. "my-password"
 
