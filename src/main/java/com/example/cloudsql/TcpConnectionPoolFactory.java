@@ -55,7 +55,6 @@ public class TcpConnectionPoolFactory extends ConnectionPoolFactory {
     config.setJdbcUrl(String.format("jdbc:postgresql://%s:%s/%s", INSTANCE_HOST, DB_PORT, DB_NAME));
     config.setUsername(DB_USER); // e.g. "root", "postgres"
     config.setPassword(DB_PASS); // e.g. "my-password"
-
     // [END cloud_sql_postgres_servlet_connect_tcp]
     // (OPTIONAL) Configure SSL certificates
     // For deployments that connect directly to a Cloud SQL instance without
