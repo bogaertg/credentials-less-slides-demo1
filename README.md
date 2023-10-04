@@ -1,179 +1,243 @@
-# Connecting to Cloud SQL - Postgres
+# Connecting to Cloud SQL (Postgres) from a Go web app
+
+This repo contains the Go source code for a simple web app that can be deployed to App Engine Standard. It is a demonstration of how to connect to a Postgres instance in Cloud SQL. The application is the "Tabs vs Spaces" web app used in the [Building Stateful Applications With Kubernetes and Cloud SQL](https://www.youtube.com/watch?v=qVgzP3PsXFw&t=1833s) session at Cloud Next '19.
 
 ## Before you begin
 
-1. If you haven't already, set up a Java Development Environment (including google-cloud-sdk and 
-maven utilities) by following the [java setup guide](https://cloud.google.com/java/docs/setup) and 
-[create a project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
+1. If you haven't already, set up a Go Development Environment by following the [Go setup guide](https://cloud.google.com/go/docs/setup) and
+   [create a project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
 
-1. Create a 2nd Gen Cloud SQL Instance by following these 
-[instructions](https://cloud.google.com/sql/docs/postgres/create-instance). Note the connection string,
-database user, and database password that you create.
+1. Create a Cloud SQL for Postgres instance by following these
+   [instructions](https://cloud.google.com/sql/docs/postgres/create-instance).
+   Note the connection string, database user, and database password that you create.
 
-1. Create a database for your application by following these 
-[instructions](https://cloud.google.com/sql/docs/postgres/create-manage-databases). Note the database
-name. 
+1. Create a database for your application by following these
+   [instructions](https://cloud.google.com/sql/docs/postgres/create-manage-databases).
+   Note the database name.
 
-1. Create a service account with the 'Cloud SQL Client' permissions by following these 
-[instructions](https://cloud.google.com/sql/docs/postgres/connect-external-app#4_if_required_by_your_authentication_method_create_a_service_account).
-Download a JSON key to use to authenticate your connection. 
+1. Create a service account with the 'Cloud SQL Client' permissions by following these
+   [instructions](https://cloud.google.com/sql/docs/mysql/connect-external-app#4_if_required_by_your_authentication_method_create_a_service_account).
+   Download a JSON key to use to authenticate your connection.
 
-1. Use the information noted in the previous steps:
+## Running locally
+
+To run this application locally, download and install the `cloud_sql_proxy` by
+following the instructions
+[here](https://cloud.google.com/sql/docs/postgres/sql-proxy#install).
+
+Instructions are provided below for using the proxy with a TCP connection or a Unix Domain Socket. On Linux or Mac OS you can use either option, but on Windows the proxy currently requires a TCP connection.
+
+### Launch proxy with TCP
+
+To run the sample locally with a TCP connection, set environment variables and launch the proxy as shown below.
+
+#### Linux / Mac OS
+
+Use these terminal commands to initialize environment variables:
+
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service/account/key.json
-export INSTANCE_CONNECTION_NAME='<MY-PROJECT>:<INSTANCE-REGION>:<INSTANCE-NAME>'
-export DB_USER='my-db-user'
-export DB_PASS='my-db-pass'
-export DB_NAME='my_db'
+export INSTANCE_HOST='127.0.0.1'
+export DB_PORT='5432'
+export DB_USER='<YOUR_DB_USER_NAME>'
+export DB_PASS='<YOUR_DB_PASSWORD>'
+export DB_NAME='<YOUR_DB_NAME>'
 ```
+
+Then use this command to launch the proxy in the background:
+
+```bash
+./cloud_sql_proxy -instances=<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>=tcp:5432 -credential_file=$GOOGLE_APPLICATION_CREDENTIALS &
+```
+
+#### Windows/PowerShell
+
+Use these PowerShell commands to initialize environment variables:
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="<CREDENTIALS_JSON_FILE>"
+$env:INSTANCE_HOST="127.0.0.1"
+$env:DB_PORT="5432"
+$env:DB_USER="<YOUR_DB_USER_NAME>"
+$env:DB_PASS="<YOUR_DB_PASSWORD>"
+$env:DB_NAME="<YOUR_DB_NAME>"
+```
+
+Then use this command to launch the proxy in a separate PowerShell session:
+
+```powershell
+Start-Process -filepath "C:\<path to proxy exe>" -ArgumentList "-instances=<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>=tcp:5432 -credential_file=<CREDENTIALS_JSON_FILE>"
+```
+
+### Launch proxy with Unix Domain Socket
+
+NOTE: this option is currently only supported on Linux and Mac OS. Windows users should use the [Launch proxy with TCP](#launch-proxy-with-tcp) option.
+
+To use a Unix socket, you'll need to create a directory and give write access to the user running the proxy. For example:
+
+```bash
+sudo mkdir ./cloudsql
+sudo chown -R $USER ./cloudsql
+```
+
+Use these terminal commands to initialize environment variables:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service/account/key.json
+export INSTANCE_UNIX_SOCKET='./cloudsql/<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>'
+export DB_USER='<YOUR_DB_USER_NAME>'
+export DB_PASS='<YOUR_DB_PASSWORD>'
+export DB_NAME='<YOUR_DB_NAME>'
+```
+
+Then use this command to launch the proxy in the background:
+
+```bash
+./cloud_sql_proxy -dir=./cloudsql --instances=<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME> --credential_file=$GOOGLE_APPLICATION_CREDENTIALS &
+```
+
+### Testing the application
+
+To test the application locally, follow these steps after the proxy is running:
+
+- Install dependencies: `go get ./...`
+- Run the application: `go run cloudsql.go`
+- Navigate to `http://127.0.0.1:8080` in a web browser to verify your application is running correctly.
+
+## Deploying to App Engine Standard
+
+To run the sample on GAE-Standard, create an App Engine project by following the setup for these
+[instructions](https://cloud.google.com/appengine/docs/standard/go/quickstart#before-you-begin).
+
+First, update [`app.standard.yaml`](cmd/app/app.standard.yaml) with the correct values to pass the environment
+variables into the runtime. Your `app.standard.yaml` file should look like this:
+
+```yaml
+runtime: go116
+env_variables:
+  INSTANCE_UNIX_SOCKET: /cloudsql/<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>
+  DB_USER: <YOUR_DB_USER_NAME>
+  DB_PASS: <YOUR_DB_PASSWORD>
+  DB_NAME: <YOUR_DB_NAME>
+```
+
 Note: Saving credentials in environment variables is convenient, but not secure - consider a more
-secure solution such as [Secret Manager](https://cloud.google.com/secret-manager/) to help keep secrets safe.
-
-## Configure SSL Certificates
-For deployments that connect directly to a Cloud SQL instance with TCP,
-without using the Cloud SQL Proxy,
-configuring SSL certificates will ensure the connection is encrypted.
-1. Use the gcloud CLI to [download the server certificate](https://cloud.google.com/sql/docs/mysql/configure-ssl-instance#server-certs) for your Cloud SQL instance.
-    - Get information about the service certificate:
-        ```
-        gcloud beta sql ssl server-ca-certs list --instance=INSTANCE_NAME
-        ```
-    - Create a server certificate:
-        ```
-        gcloud beta sql ssl server-ca-certs create --instance=INSTANCE_NAME
-        ```
-    - Download the certificate information to a local PEM file
-        ```
-        gcloud beta sql ssl server-ca-certs list \
-          --format="value(cert)" \
-          --instance=INSTANCE_NAME > \
-          server-ca.pem
-        ```
-
-2. Use the gcloud CLI to [create and download a client public key certificate and client private key](https://cloud.google.com/sql/docs/postgres/configure-ssl-instance#client-certs)
-    - Create a client certificate using the ssl client-certs create command:
-        ```
-        gcloud sql ssl client-certs create CERT_NAME client-key.pem --instance=INSTANCE_NAME
-        ```
-    - Retrieve the public key for the certificate you just created and copy it into the client-cert.pem file with the ssl client-certs describe command:
-      ```
-      gcloud sql ssl client-certs describe CERT_NAME \
-      --instance=INSTANCE_NAME \
-      --format="value(cert)" > client-cert.pem
-        ```
-3. Convert the downloaded PEM certificate and key to a PKCS12 archive using `openssl`:
-   ```
-   openssl pkcs12 -export -in client-cert.pem -inkey client-key.pem \
-   -name "mysqlclient" -passout pass:<password> -out client-keystore.p12
-   ```
-4. Set the `SSL_CLIENT_KEY_PATH` and `SSL_CLIENT_KEY_PASSWD` environment variables to the values from the previous step. 
-The client key path should point to the PKCS12 archive file.
-6. Set the `SSL_SERVER_CA_PATH` environment variables to point to the `server-ca.pem` file downloaded earlier
-
-## Deploying locally
-To run this application locally, run the following command inside the project folder:
-
-```bash
-mvn jetty:run
-```
-
-Navigate towards `http://127.0.0.1:8080` to verify your application is running correctly.
-
-## Google App Engine Standard
-
-To run on GAE-Standard, create an AppEngine project by following the setup for these 
-[instructions](https://cloud.google.com/appengine/docs/standard/java/quickstart#before-you-begin) 
-and verify that 
-[appengine-maven-plugin](https://cloud.google.com/java/docs/setup#optional_install_maven_or_gradle_plugin_for_app_engine)
- has been added in your build section as a plugin.
-
-
-### App Engine Development Server
-
-The following command will run the application locally in the the GAE-development server:
-```bash
-mvn appengine:run
-```
-
-### Cloud Functions Development Server
-To run the application locally as a Cloud Function, run the following command:
-```
-mvn function:run -Drun.functionTarget=com.example.cloudsql.functions.Main
-```
-
-### Deploy to Google App Engine
-
-First, update [`src/main/webapp/WEB-INF/appengine-web.xml`](src/main/webapp/WEB-INF/appengine-web.xml)
-with the correct values to pass the environment variables into the runtime.
+secure solution such as [Cloud Secret Manager](https://cloud.google.com/secret-manager) to help keep secrets safe.
 
 Next, the following command will deploy the application to your Google Cloud project:
+
 ```bash
-mvn clean package appengine:deploy -DskipTests
+gcloud app deploy cmd/app/app.standard.yaml
 ```
 
-### Deploy to Cloud Run
+## Deploying to App Engine Flexible
 
-See the [Cloud Run documentation](https://cloud.google.com/run/docs/configuring/connect-cloudsql)
+To run the sample on GAE-Flex, create an App Engine project by following the setup for these
+[instructions](https://cloud.google.com/appengine/docs/standard/go/quickstart#before-you-begin).
+
+First, update [`app.flexible.yaml`](app.flexible.yaml) with the correct values to pass the environment
+variables into the runtime. Your `app.flexible.yaml` file should look like this:
+
+```yaml
+runtime: custom
+env: flex
+
+env_variables:
+  INSTANCE_UNIX_SOCKET: /cloudsql/<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>
+  DB_USER: <YOUR_DB_USER_NAME>
+  DB_PASS: <YOUR_DB_PASSWORD>
+  DB_NAME: <YOUR_DB_NAME>
+
+beta_settings:
+  cloud_sql_instances: <PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>
+```
+
+Note: Saving credentials in environment variables is convenient, but not secure - consider a more
+secure solution such as [Cloud Secret Manager](https://cloud.google.com/secret-manager) to help keep secrets safe.
+
+Next, the following command will deploy the application to your Google Cloud project:
+
+```bash
+gcloud app deploy app.flexible.yaml
+```
+
+## Deploy to Cloud Run
+
+See the [Cloud Run documentation](https://cloud.google.com/sql/docs/postgres/connect-run)
 for more details on connecting a Cloud Run service to Cloud SQL.
 
-1. Build the container image using [Jib](https://cloud.google.com/java/getting-started/jib):
+1. Build the container image:
 
-  ```sh
-mvn clean package com.google.cloud.tools:jib-maven-plugin:2.8.0:build \
- -Dimage=gcr.io/[YOUR_PROJECT_ID]/run-postgres -DskipTests
-  ```
+```sh
+gcloud builds submit --tag gcr.io/[YOUR_PROJECT_ID]/run-sql
+```
 
 2. Deploy the service to Cloud Run:
 
-  ```sh
-  gcloud run deploy run-postgres \
-    --image gcr.io/[YOUR_PROJECT_ID]/run-postgres \
-    --platform managed \
-    --allow-unauthenticated \
-    --region [REGION] \
-    --update-env-vars INSTANCE_CONNECTION_NAME=[INSTANCE_CONNECTION_NAME] \
-    --update-env-vars DB_USER=[MY_DB_USER] \
-    --update-env-vars DB_PASS=[MY_DB_PASS] \
-    --update-env-vars DB_NAME=[MY_DB]
-  ```
+```sh
+gcloud run deploy run-sql --image gcr.io/[YOUR_PROJECT_ID]/run-sql \
+  --add-cloudsql-instances '<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>' \
+  --set-env-vars INSTANCE_UNIX_SOCKET='/cloudsql/<PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME>' \
+  --set-env-vars DB_USER='<YOUR_DB_USER_NAME>' \
+  --set-env-vars DB_PASS='<YOUR_DB_PASSWORD>' \
+  --set-env-vars DB_NAME='<YOUR_DB_NAME>'
+```
 
-  Replace environment variables with the correct values for your Cloud SQL
-  instance configuration.
+Take note of the URL output at the end of the deployment process.
 
-  Take note of the URL output at the end of the deployment process.
+Replace environment variables with the correct values for your Cloud SQL
+instance configuration.
 
-  It is recommended to use the [Secret Manager integration](https://cloud.google.com/run/docs/configuring/secrets) for Cloud Run instead
-  of using environment variables for the SQL configuration. The service injects the SQL credentials from
-  Secret Manager at runtime via an environment variable.
+It is recommended to use the [Secret Manager integration](https://cloud.google.com/run/docs/configuring/secrets) for Cloud Run instead
+of using environment variables for the SQL configuration. The service injects the SQL credentials from
+Secret Manager at runtime via an environment variable.
 
-  Create secrets via the command line:
-  ```sh
-  echo -n "my-awesome-project:us-central1:my-cloud-sql-instance" | \
-      gcloud secrets versions add INSTANCE_CONNECTION_NAME_SECRET --data-file=-
-  ```
+Create secrets via the command line:
+```sh
+echo -n $INSTANCE_UNIX_SOCKET | \
+    gcloud secrets create [INSTANCE_UNIX_SOCKET_SECRET] --data-file=-
+```
 
-  Deploy the service to Cloud Run specifying the env var name and secret name:
-  ```sh
-  gcloud beta run deploy SERVICE --image gcr.io/[YOUR_PROJECT_ID]/run-sql \
-      --add-cloudsql-instances [INSTANCE_CONNECTION_NAME] \
-      --update-secrets INSTANCE_CONNECTION_NAME=[INSTANCE_CONNECTION_NAME_SECRET]:latest,\
-        DB_USER=[DB_USER_SECRET]:latest, \
-        DB_PASS=[DB_PASS_SECRET]:latest, \
-        DB_NAME=[DB_NAME_SECRET]:latest
-  ```
+Deploy the service to Cloud Run specifying the env var name and secret name:
+```sh
+gcloud beta run deploy SERVICE --image gcr.io/[YOUR_PROJECT_ID]/run-sql \
+    --add-cloudsql-instances <PROJECT-ID>:<INSTANCE-REGION>:<INSTANCE-NAME> \
+    --update-secrets INSTANCE_UNIX_SOCKET=[INSTANCE_UNIX_SOCKET_SECRET]:latest,\
+      DB_USER=[DB_USER_SECRET]:latest, \
+      DB_PASS=[DB_PASS_SECRET]:latest, \
+      DB_NAME=[DB_NAME_SECRET]:latest
+```
 
 3. Navigate your browser to the URL noted in step 2.
 
-  For more details about using Cloud Run see http://cloud.run.
-  Review other [Java on Cloud Run samples](../../../run/).
+For more details about using Cloud Run see http://cloud.run.
 
-### Deploy to Google Cloud Functions
+## Deploy to Cloud Functions
 
-To deploy the application to Cloud Functions, first fill in the values for required environment variables in `.env.yaml`. Then run the following command
+To deploy the service to [Cloud Functions](https://cloud.google.com/functions/docs) run the following command:
+
+```sh
+gcloud functions deploy votes --gen2 --runtime go120 --trigger-http \
+  --allow-unauthenticated \
+  --entry-point Votes \
+  --region <INSTANCE_REGION> \
+  --set-env-vars INSTANCE_UNIX_SOCKET=/cloudsql/<PROJECT_ID>:<INSTANCE_REGION>:<INSTANCE_NAME> \
+  --set-env-vars DB_USER=$DB_USER \
+  --set-env-vars DB_PASS=$DB_PASS \
+  --set-env-vars DB_NAME=$DB_NAME
 ```
-gcloud functions deploy sql-sample \
-  --trigger-http \
-  --entry-point com.example.cloudsql.functions.Main \
-  --runtime java11 \
-  --env-vars-file .env.yaml
+
+Note: If the function fails to deploy or returns a `500: Internal service error`,
+this may be due to a known limitation with Cloud Functions gen2 not being able
+to configure the underlying Cloud Run service with a Cloud SQL connection.
+
+A workaround command to fix this is is to manually revise the Cloud Run
+service with the Cloud SQL Connection:
+
+```sh
+gcloud run deploy votes --source . \
+  --region <INSTANCE_REGION> \
+  --add-cloudsql-instances <PROJECT_ID>:<INSTANCE_REGION>:<INSTANCE_NAME>
 ```
+
+The Cloud Function command above can now be re-run with a successful deployment.
